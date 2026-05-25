@@ -1,21 +1,5 @@
 import Foundation
 
-struct DiscoveryDocument: Decodable {
-    let issuer: String
-    let authorizationEndpoint: URL
-    let tokenEndpoint: URL
-    let userinfoEndpoint: URL?
-    let endSessionEndpoint: URL?
-
-    enum CodingKeys: String, CodingKey {
-        case issuer
-        case authorizationEndpoint = "authorization_endpoint"
-        case tokenEndpoint = "token_endpoint"
-        case userinfoEndpoint = "userinfo_endpoint"
-        case endSessionEndpoint = "end_session_endpoint"
-    }
-}
-
 struct TokenResponse: Codable {
     let accessToken: String
     let idToken: String?
@@ -44,9 +28,4 @@ struct UserProfile: Decodable {
         case email
         case preferredUsername = "preferred_username"
     }
-}
-
-struct AuthenticationResult {
-    let tokens: TokenResponse
-    let profile: UserProfile?
 }

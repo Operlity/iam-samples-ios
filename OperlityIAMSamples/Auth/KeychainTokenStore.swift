@@ -3,10 +3,9 @@ import Security
 
 final class KeychainTokenStore {
     private let service = "com.operlity.iam.samples.ios.tokens"
-    private let account = "oidc-token-response"
+    private let account = "appauth-state"
 
-    func save(_ tokens: TokenResponse) throws {
-        let data = try JSONEncoder().encode(tokens)
+    func save(_ data: Data) throws {
         delete()
 
         let query: [String: Any] = [
@@ -23,7 +22,7 @@ final class KeychainTokenStore {
         }
     }
 
-    func load() throws -> TokenResponse? {
+    func load() throws -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -43,7 +42,7 @@ final class KeychainTokenStore {
             throw OIDCError.keychain(status)
         }
 
-        return try JSONDecoder().decode(TokenResponse.self, from: data)
+        return data
     }
 
     func delete() {

@@ -3,21 +3,19 @@ import Foundation
 struct IdentityHubConfiguration {
     let issuer: URL
     let clientID: String
-    let clientSecret: String
     let redirectURI: URL
     let postLogoutRedirectURI: URL
-    let scope: String
+    let scopes: [String]
 
     var callbackScheme: String {
         redirectURI.scheme ?? ""
     }
 
     static let demo = IdentityHubConfiguration(
-        issuer: URL(string: "https://id.demo.operlity.com")!,
+        issuer: URL(string: "https://ogsiamapp.azurewebsites.net")!,
         clientID: "replace-with-your-client-id",
-        clientSecret: "replace-with-your-client-secret",
-        redirectURI: URL(string: "operlity-ios-sample://auth/callback")!,
-        postLogoutRedirectURI: URL(string: "operlity-ios-sample://auth/logout")!,
-        scope: "openid profile email offline_access"
+        redirectURI: URL(string: "com.operlity.iam.samples.ios:/oauthredirect")!,
+        postLogoutRedirectURI: URL(string: "com.operlity.iam.samples.ios:/signout-callback")!,
+        scopes: ["openid", "profile", "email", "offline_access"]
     )
 }

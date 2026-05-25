@@ -25,7 +25,7 @@
 			<string>Operlity IAM Callback</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>operlity-ios-sample</string>
+				<string>com.operlity.iam.samples.ios</string>
 			</array>
 		</dict>
 	</array>

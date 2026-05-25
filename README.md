@@ -1,19 +1,18 @@
 # Operlity IAM iOS Sample
 
-Sample native iOS application showing how to authenticate with Operlity Identity Hub using OpenID Connect Authorization Code + PKCE.
+Sample native iOS application showing how to authenticate with Operlity Identity Hub using AppAuth, OpenID Connect Authorization Code, and PKCE.
 
-The app intentionally has no third-party dependencies. It uses:
+The app uses:
 
 - SwiftUI for the sample UI
-- `ASWebAuthenticationSession` for the system browser login flow
-- PKCE with SHA-256
-- `URLSession` for discovery, token exchange, and userinfo
-- Keychain for local token persistence
+- AppAuth for discovery, PKCE, browser presentation, redirect handling, token exchange, and refresh
+- Keychain for `OIDAuthState` persistence
+- `URLSession` for the userinfo call
 
 ## Prerequisites
 
 - macOS with Xcode 16 or newer installed
-- An Operlity Identity Hub application configured as a public/native client
+- An Operlity Identity Hub application configured as a Native / Mobile public client
 - iOS 16 or newer simulator or device
 
 After installing Xcode, make sure the command line tools point to Xcode:
@@ -25,7 +24,8 @@ sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 ## Quick Start
 
 1. Open `OperlityIAMSamples.xcodeproj` in Xcode.
-2. Update the sample client ID and client secret in `OperlityIAMSamples/Auth/IdentityHubConfiguration.swift`.
+2. Xcode should resolve the `https://github.com/openid/AppAuth-iOS.git` package automatically.
+3. Update the sample values in `OperlityIAMSamples/Auth/IdentityHubConfiguration.swift` if your Identity Hub issuer or API scope differs.
 3. Select a simulator or a signing team for a physical device.
 4. Build and run.
 5. Tap **Login with Identity Hub**.
@@ -33,14 +33,14 @@ sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 The default issuer is:
 
 ```text
-https://id.demo.operlity.com
+https://ogsiamapp.azurewebsites.net
 ```
 
 The default redirect values are:
 
 ```text
-operlity-ios-sample://auth/callback
-operlity-ios-sample://auth/logout
+com.operlity.iam.samples.ios:/oauthredirect
+com.operlity.iam.samples.ios:/signout-callback
 ```
 
 ## Identity Hub Configuration
@@ -49,13 +49,16 @@ Create an application in Operlity Identity Hub with these settings:
 
 | Setting | Value |
 | --- | --- |
-| Application type | Web / Confidential Client, if your Identity Hub requires a secret |
+| Client ID | `replace-with-your-client-id` |
+| Application type | Native / Mobile |
 | Grant type | Authorization Code |
 | PKCE | Required, S256 |
-| Client secret | Required |
-| Redirect URI | `operlity-ios-sample://auth/callback` |
-| Post logout redirect URI | `operlity-ios-sample://auth/logout` |
+| Client secret | Disabled / not required |
+| Redirect URI | `com.operlity.iam.samples.ios:/oauthredirect` |
+| Post logout redirect URI | `com.operlity.iam.samples.ios:/signout-callback` |
 | Allow offline access | Enabled |
+| Refresh token usage | One time only |
+| Access token lifetime | `3600` seconds |
 | Scopes | `openid profile email offline_access` |
 
 For a real application, replace the custom URL scheme with one you own and keep it unique to your bundle.
@@ -70,8 +73,8 @@ OperlityIAMSamples/
     KeychainTokenStore.swift
     OIDCClient.swift
     OIDCModels.swift
-    PKCE.swift
   Assets.xcassets
+  AppDelegate.swift
   ContentView.swift
   Info.plist
   OperlityIAMSamplesApp.swift
@@ -79,13 +82,14 @@ OperlityIAMSamples/
 
 ## Authentication Flow
 
-1. The app fetches `/.well-known/openid-configuration` from Identity Hub.
-2. The app generates a PKCE verifier, challenge, and state value.
-3. `ASWebAuthenticationSession` opens the Identity Hub authorization endpoint.
-4. Identity Hub redirects back to `operlity-ios-sample://auth/callback`.
-5. The app validates `state` and exchanges the authorization code at the token endpoint.
-6. Tokens are stored in Keychain and the user profile is loaded from the userinfo endpoint when available.
-7. Logout clears local tokens and opens the Identity Hub end-session endpoint when discovery exposes one.
+1. AppAuth discovers Identity Hub endpoints from `/.well-known/openid-configuration`.
+2. AppAuth creates the authorization request with PKCE.
+3. AppAuth opens the system browser login session.
+4. Identity Hub redirects back to `com.operlity.iam.samples.ios:/oauthredirect`.
+5. The app forwards that URL to AppAuth with `resumeExternalUserAgentFlow` from both `AppDelegate` and SwiftUI `.onOpenURL`.
+6. AppAuth validates state and exchanges the authorization code for tokens.
+7. `OIDAuthState` is stored in Keychain and can refresh access tokens with one-time refresh tokens.
+8. Logout opens the end-session endpoint and clears local Keychain state.
 
 ## Configuration
 
@@ -93,12 +97,11 @@ Edit `OperlityIAMSamples/Auth/IdentityHubConfiguration.swift`:
 
 ```swift
 static let demo = IdentityHubConfiguration(
-    issuer: URL(string: "https://id.demo.operlity.com")!,
-    clientID: "ios-sample-client-id",
-    clientSecret: "replace-with-your-client-secret",
-    redirectURI: URL(string: "operlity-ios-sample://auth/callback")!,
-    postLogoutRedirectURI: URL(string: "operlity-ios-sample://auth/logout")!,
-    scope: "openid profile email offline_access"
+    issuer: URL(string: "https://ogsiamapp.azurewebsites.net")!,
+    clientID: "replace-with-your-client-id",
+    redirectURI: URL(string: "com.operlity.iam.samples.ios:/oauthredirect")!,
+    postLogoutRedirectURI: URL(string: "com.operlity.iam.samples.ios:/signout-callback")!,
+    scopes: ["openid", "profile", "email", "offline_access"]
 )
 ```
 
@@ -106,9 +109,9 @@ If you change the redirect scheme, also update `CFBundleURLTypes` in `OperlityIA
 
 ## Notes for Open Source Consumers
 
-- Do not commit a real client secret to this public repository. Replace it locally while testing.
-- A client secret embedded in an iOS app can be extracted from the app bundle. Use this only because this Identity Hub client requires it for the POC.
-- The placeholder client ID is not sensitive, but it must match your Identity Hub application.
+- Native iOS apps are public clients. Do not configure or ship a client secret.
+- PKCE is required and is handled by AppAuth.
+- The client ID is not sensitive, but it must match your Identity Hub application.
 - Use Universal Links for production apps when possible. Custom schemes are convenient for samples and demos.
 - Token lifetimes, refresh token rotation, and logout behavior are controlled by your Identity Hub application policy.
 - Request `offline_access` only when you want Identity Hub to issue refresh tokens.
@@ -120,7 +123,7 @@ If you change the redirect scheme, also update `CFBundleURLTypes` in `OperlityIA
 The redirect URI in Identity Hub must exactly match:
 
 ```text
-operlity-ios-sample://auth/callback
+com.operlity.iam.samples.ios:/oauthredirect
 ```
 
 ### The app does not reopen after login
@@ -128,7 +131,7 @@ operlity-ios-sample://auth/callback
 Confirm `Info.plist` contains the same URL scheme as the redirect URI:
 
 ```text
-operlity-ios-sample
+com.operlity.iam.samples.ios
 ```
 
 ### Issuer mismatch
